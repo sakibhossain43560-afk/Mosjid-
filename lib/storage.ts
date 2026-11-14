@@ -65,3 +65,4 @@ export function resetToDefaults(): {
     settings: DEFAULT_SETTINGS,
   };
 }
+

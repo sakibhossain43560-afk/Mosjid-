@@ -182,3 +182,4 @@ export function exportToCSV(transactions: Transaction[], mosqueName: string) {
   link.click();
   document.body.removeChild(link);
 }
+

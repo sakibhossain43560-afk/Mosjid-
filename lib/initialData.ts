@@ -269,3 +269,4 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
     createdAt: '2026-11-06T10:00:00Z',
   },
 ];
+

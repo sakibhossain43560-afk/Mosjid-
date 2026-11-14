@@ -57,3 +57,4 @@ export interface MosqueSettings {
   customIncomeCategories: string[];
   customExpenseCategories: string[];
 }
+
