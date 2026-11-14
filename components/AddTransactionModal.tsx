@@ -13,7 +13,17 @@ import {
   CreditCard,
   MessageSquare,
   Sparkles,
+  Zap,
 } from 'lucide-react';
+
+export interface PresetPayload {
+  type: TransactionType;
+  category: string;
+  title: string;
+  donorOrReceiver?: string;
+  suggestedAmount?: number;
+  isJummah?: boolean;
+}
 
 interface AddTransactionModalProps {
   isOpen: boolean;
@@ -23,6 +33,7 @@ interface AddTransactionModalProps {
   expenseCategories: string[];
   initialType?: TransactionType;
   editingTransaction?: Transaction | null;
+  presetData?: PresetPayload | null;
 }
 
 export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
@@ -33,6 +44,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   expenseCategories,
   initialType = 'income',
   editingTransaction,
+  presetData,
 }) => {
   const [type, setType] = useState<TransactionType>(initialType);
   const [category, setCategory] = useState<string>('');
@@ -51,6 +63,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   const [collectedBy, setCollectedBy] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
+  // Quick Amount preset chips
+  const quickAmounts = [100, 500, 1000, 2000, 5000, 10000, 20000];
+
   useEffect(() => {
     if (editingTransaction) {
       setType(editingTransaction.type);
@@ -67,6 +82,25 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       setKhutbahTopic(editingTransaction.jummahDetails?.khutbahTopic || '');
       setCollectedBy(editingTransaction.jummahDetails?.collectedBy || '');
       setNotes(editingTransaction.notes || '');
+      setIsCustomCategory(false);
+    } else if (presetData) {
+      // Applied from 1-click Preset
+      setType(presetData.type);
+      setCategory(presetData.category);
+      setAmount(presetData.suggestedAmount ? presetData.suggestedAmount.toString() : '');
+      setDate(new Date().toISOString().split('T')[0]);
+      setTitle(presetData.title);
+      setDonorOrReceiver(presetData.donorOrReceiver || '');
+      setPaymentMethod('cash');
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
+      setReceiptNo(presetData.type === 'income' ? `REC-${randomNum}` : `VOU-${randomNum}`);
+      setIsJummah(!!presetData.isJummah);
+      setAttendees('');
+      setBoxNumber('');
+      setKhutbahTopic('');
+      setCollectedBy('');
+      setNotes('');
+      setIsCustomCategory(false);
     } else {
       // New transaction defaults
       setType(initialType);
@@ -85,10 +119,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
       setKhutbahTopic('');
       setCollectedBy('');
       setNotes('');
+      setIsCustomCategory(false);
     }
-  }, [editingTransaction, initialType, isOpen, incomeCategories, expenseCategories]);
+  }, [editingTransaction, presetData, initialType, isOpen, incomeCategories, expenseCategories]);
 
-  // When type changes, adjust category
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
     const availableCategories = newType === 'income' ? incomeCategories : expenseCategories;
@@ -97,6 +131,16 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     if (!editingTransaction) {
       const randomNum = Math.floor(1000 + Math.random() * 9000);
       setReceiptNo(newType === 'income' ? `REC-${randomNum}` : `VOU-${randomNum}`);
+    }
+  };
+
+  const handleQuickAmountClick = (val: number) => {
+    const current = parseFloat(amount) || 0;
+    // If empty or zero, set it; otherwise add to it
+    if (!amount || current === 0) {
+      setAmount(val.toString());
+    } else {
+      setAmount((current + val).toString());
     }
   };
 
@@ -159,17 +203,22 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               : 'bg-gradient-to-r from-rose-800 to-rose-900'
           }`}
         >
-          <div>
-            <h3 className="font-bold text-lg sm:text-xl">
-              {editingTransaction
-                ? 'লেনদেন সম্পাদনা করুন'
-                : type === 'income'
-                ? '+ নতুন আয় / অনুদান যুক্ত করুন'
-                : '- নতুন ব্যয় / খরচ যুক্ত করুন'}
-            </h3>
-            <p className="text-xs text-white/80 mt-0.5">
-              সঠিক হিসাব এন্ট্রি করে ক্যাশ ব্যালেন্স আপডেট করুন
-            </p>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-xl">
+              {type === 'income' ? '💰' : '🧾'}
+            </div>
+            <div>
+              <h3 className="font-extrabold text-base sm:text-lg">
+                {editingTransaction
+                  ? 'লেনদেন সম্পাদনা করুন'
+                  : type === 'income'
+                  ? '+ নতুন জমা / আয় এন্ট্রি'
+                  : '- নতুন খরচ / ব্যয় এন্ট্রি'}
+              </h3>
+              <p className="text-xs text-white/80 mt-0.5">
+                সঠিক পরিমাণ ও খাত লিখে সংরক্ষণ করুন
+              </p>
+            </div>
           </div>
 
           <button
@@ -184,13 +233,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
           {/* Type Selector (Income vs Expense) */}
           {!editingTransaction && (
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
               <button
                 type="button"
                 onClick={() => handleTypeChange('income')}
-                className={`py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                className={`py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all ${
                   type === 'income'
-                    ? 'bg-emerald-600 text-white shadow'
+                    ? 'bg-emerald-600 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -199,9 +248,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleTypeChange('expense')}
-                className={`py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                className={`py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all ${
                   type === 'expense'
-                    ? 'bg-rose-600 text-white shadow'
+                    ? 'bg-rose-600 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -210,23 +259,57 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             </div>
           )}
 
-          {/* Amount & Date in 2 columns */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                টাকার পরিমাণ (৳) <span className="text-rose-500">*</span>
-              </label>
+          {/* Amount Box with Quick Numpad Chips */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              টাকার পরিমাণ (৳) <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-2.5 text-lg font-bold text-slate-400">৳</span>
               <input
                 type="number"
                 step="any"
                 required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="যেমন: 5000"
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-mosque-600"
+                placeholder="0"
+                autoFocus
+                className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-300 text-xl font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-mosque-600 bg-white"
               />
             </div>
 
+            {/* Quick Amount Chips */}
+            <div className="mt-2.5">
+              <div className="text-[11px] font-semibold text-slate-500 mb-1 flex items-center gap-1">
+                <Zap className="w-3 h-3 text-gold-500" />
+                <span>দ্রুত যোগ করতে চাপুন:</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {quickAmounts.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => handleQuickAmountClick(q)}
+                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 text-xs font-bold shadow-sm transition-all active:scale-95"
+                  >
+                    +৳{q.toLocaleString('en-IN')}
+                  </button>
+                ))}
+                {amount && (
+                  <button
+                    type="button"
+                    onClick={() => setAmount('')}
+                    className="px-2 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs font-semibold"
+                  >
+                    মুছুন
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Date & Category */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 তারিখ <span className="text-rose-500">*</span>
@@ -239,6 +322,23 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-mosque-600"
               />
             </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                পেমেন্ট মাধ্যম
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-mosque-600 bg-white"
+              >
+                <option value="cash">নগদ ক্যাশ (Cash)</option>
+                <option value="bkash">বিকাশ (bKash)</option>
+                <option value="nagad">নগদ (Nagad)</option>
+                <option value="rocket">রকেট (Rocket)</option>
+                <option value="bank">ব্যাংক ট্রান্সফার / চেক</option>
+              </select>
+            </div>
           </div>
 
           {/* Category */}
@@ -248,27 +348,25 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               <span className="text-rose-500">*</span>
             </label>
             {!isCustomCategory ? (
-              <div className="flex gap-2">
-                <select
-                  value={category}
-                  onChange={(e) => {
-                    if (e.target.value === 'CUSTOM') {
-                      setIsCustomCategory(true);
-                      setCustomCategory('');
-                    } else {
-                      setCategory(e.target.value);
-                    }
-                  }}
-                  className="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-mosque-600 bg-white"
-                >
-                  {currentCategories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                  <option value="CUSTOM">+ অন্য নতুন খাত লিখুন...</option>
-                </select>
-              </div>
+              <select
+                value={category}
+                onChange={(e) => {
+                  if (e.target.value === 'CUSTOM') {
+                    setIsCustomCategory(true);
+                    setCustomCategory('');
+                  } else {
+                    setCategory(e.target.value);
+                  }
+                }}
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-mosque-600 bg-white"
+              >
+                {currentCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+                <option value="CUSTOM">+ অন্য নতুন খাত লিখুন...</option>
+              </select>
             ) : (
               <div className="flex gap-2">
                 <input
@@ -282,9 +380,9 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsCustomCategory(false)}
-                  className="px-3 py-2 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 rounded-xl"
+                  className="px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 rounded-xl"
                 >
-                  তালিকা থেকে
+                  ড্রপডাউন তালিকা
                 </button>
               </div>
             )}
@@ -308,7 +406,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             />
           </div>
 
-          {/* Donor or Receiver & Payment Method */}
+          {/* Donor/Receiver & Receipt No */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -325,39 +423,21 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                পেমেন্ট মাধ্যম
+                রশিদ / ভাউচার নং
               </label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-mosque-600 bg-white"
-              >
-                <option value="cash">নগদ ক্যাশ (Cash)</option>
-                <option value="bkash">বিকাশ (bKash)</option>
-                <option value="nagad">নগদ (Nagad)</option>
-                <option value="rocket">রকেট (Rocket)</option>
-                <option value="bank">ব্যাংক ট্রান্সফার / চেক</option>
-              </select>
+              <input
+                type="text"
+                value={receiptNo}
+                onChange={(e) => setReceiptNo(e.target.value)}
+                placeholder="REC-001"
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-mosque-600"
+              />
             </div>
-          </div>
-
-          {/* Receipt / Voucher No */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              রশিদ নং / ভাউচার নং
-            </label>
-            <input
-              type="text"
-              value={receiptNo}
-              onChange={(e) => setReceiptNo(e.target.value)}
-              placeholder="যেমন: REC-2026-01"
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-mosque-600"
-            />
           </div>
 
           {/* Friday Jummah Toggle */}
           {type === 'income' && (
-            <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200">
+            <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -365,7 +445,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                   onChange={(e) => setIsJummah(e.target.checked)}
                   className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4"
                 />
-                <span className="text-xs font-bold text-amber-900">
+                <span className="text-xs font-bold text-amber-950">
                   🕌 এটি কি শুক্রবারের জুমার নামাজ কালেকশন?
                 </span>
               </label>
@@ -374,13 +454,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 <div className="mt-3 pt-3 border-t border-amber-200 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div>
                     <label className="block font-medium text-amber-900 mb-0.5">
-                      উপস্থিতি (আনুমানিক সংখ্যা)
+                      উপস্থিতি (আনুমানিক)
                     </label>
                     <input
                       type="number"
                       value={attendees}
                       onChange={(e) => setAttendees(e.target.value)}
-                      placeholder="যেমন: 450"
+                      placeholder="450"
                       className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 text-xs bg-white"
                     />
                   </div>
@@ -404,7 +484,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                       type="text"
                       value={khutbahTopic}
                       onChange={(e) => setKhutbahTopic(e.target.value)}
-                      placeholder="যেমন: পিতা-মাতার খেদমত ও সুন্নাত"
+                      placeholder="যেমন: তাকওয়া ও আমানতদারি"
                       className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 text-xs bg-white"
                     />
                   </div>
@@ -416,13 +496,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
           {/* Notes */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              মন্তব্য / বিশেষ বিবরণ (ঐচ্ছিক)
+              মন্তব্য (ঐচ্ছিক)
             </label>
-            <textarea
-              rows={2}
+            <input
+              type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="প্রয়োজনীয় যেকোনো বিশেষ তথ্য লিখুন..."
+              placeholder="প্রয়োজনীয় কোনো বিশেষ বিবরণ..."
               className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-mosque-600"
             />
           </div>
@@ -438,10 +518,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
             </button>
             <button
               type="submit"
-              className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-white font-bold text-xs sm:text-sm shadow-md transition-all active:scale-95 ${
+              className={`flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-white font-extrabold text-xs sm:text-sm shadow-lg transition-all active:scale-95 ${
                 type === 'income'
-                  ? 'bg-emerald-600 hover:bg-emerald-700'
-                  : 'bg-rose-600 hover:bg-rose-700'
+                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600'
+                  : 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600'
               }`}
             >
               <Save className="w-4 h-4" />

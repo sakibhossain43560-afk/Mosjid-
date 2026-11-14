@@ -22,6 +22,9 @@ import { AddTransactionModal } from '../components/AddTransactionModal';
 import { QuickJummahModal } from '../components/QuickJummahModal';
 import { SettingsModal } from '../components/SettingsModal';
 import { ReceiptModal } from '../components/ReceiptModal';
+import { AdminQuickActions } from '../components/AdminQuickActions';
+import { AdminBottomDock } from '../components/AdminBottomDock';
+import { PresetPayload } from '../components/AddTransactionModal';
 import {
   Heart,
   QrCode,
@@ -47,6 +50,7 @@ export default function HomePage() {
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
   const [addTxInitialType, setAddTxInitialType] = useState<TransactionType>('income');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [presetData, setPresetData] = useState<PresetPayload | null>(null);
   const [isQuickJummahOpen, setIsQuickJummahOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
@@ -119,6 +123,14 @@ export default function HomePage() {
     setSettings(newSettings);
     saveStoredSettings(newSettings);
     syncWithApi(transactions, newSettings);
+  };
+
+  // 1-Click Quick Preset handler
+  const handleQuickPreset = (preset: PresetPayload) => {
+    setEditingTransaction(null);
+    setPresetData(preset);
+    setAddTxInitialType(preset.type);
+    setIsAddTxOpen(true);
   };
 
   // Import backup data
@@ -199,6 +211,28 @@ export default function HomePage() {
             currencySymbol={settings.currencySymbol}
           />
         </section>
+
+        {/* 1.1 Admin Quick Actions Bar (Shown when Admin/Committee is active) */}
+        {isAdmin && (
+          <section aria-label="কমিটি কুইক অ্যাকশন">
+            <AdminQuickActions
+              onQuickPreset={handleQuickPreset}
+              onOpenQuickJummah={() => setIsQuickJummahOpen(true)}
+              onOpenAddIncome={() => {
+                setEditingTransaction(null);
+                setPresetData(null);
+                setAddTxInitialType('income');
+                setIsAddTxOpen(true);
+              }}
+              onOpenAddExpense={() => {
+                setEditingTransaction(null);
+                setPresetData(null);
+                setAddTxInitialType('expense');
+                setIsAddTxOpen(true);
+              }}
+            />
+          </section>
+        )}
 
         {/* 2. Jummah Collection Tracker Section */}
         <section aria-label="জুমার নামাজ কালেকশন">
@@ -354,13 +388,35 @@ export default function HomePage() {
         onClose={() => {
           setIsAddTxOpen(false);
           setEditingTransaction(null);
+          setPresetData(null);
         }}
         onSave={handleSaveTransaction}
         incomeCategories={settings.customIncomeCategories}
         expenseCategories={settings.customExpenseCategories}
         initialType={addTxInitialType}
         editingTransaction={editingTransaction}
+        presetData={presetData}
       />
+
+      {/* Mobile Sticky Floating Dock when Admin is active */}
+      {isAdmin && (
+        <AdminBottomDock
+          onOpenAddIncome={() => {
+            setEditingTransaction(null);
+            setPresetData(null);
+            setAddTxInitialType('income');
+            setIsAddTxOpen(true);
+          }}
+          onOpenAddExpense={() => {
+            setEditingTransaction(null);
+            setPresetData(null);
+            setAddTxInitialType('expense');
+            setIsAddTxOpen(true);
+          }}
+          onOpenQuickJummah={() => setIsQuickJummahOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+        />
+      )}
 
       <QuickJummahModal
         isOpen={isQuickJummahOpen}

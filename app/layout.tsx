@@ -28,6 +28,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕌</text></svg>" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-bengali bg-slate-50 min-h-screen text-slate-800 antialiased selection:bg-mosque-200 selection:text-mosque-900">
         {children}
