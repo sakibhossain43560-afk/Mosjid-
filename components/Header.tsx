@@ -14,6 +14,8 @@ import {
   LogOut,
   Bell,
   Sparkles,
+  Smartphone,
+  Download,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -45,6 +47,28 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onAdminLogout,
 }) => {
+  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+    } else {
+      alert(
+        'আপনার মোবাইল বা কম্পিউটারে অ্যাপ হিসেবে সেভ করতে:\n১. ব্রাউজারের থ্রি-ডট (⋮) অপশনে চাপ দিন\n২. "Install app" বা "Add to Home screen"-এ ক্লিক করুন।'
+      );
+    }
+  };
   return (
     <header className="bg-gradient-to-b from-mosque-900 via-mosque-800 to-mosque-950 text-white shadow-xl relative overflow-hidden">
       {/* Subtle Islamic pattern background effect */}
@@ -144,6 +168,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <QrCode className="w-4 h-4 text-gold-300" />
               <span>কিউআর পোস্টার</span>
+            </button>
+
+            {/* Install as Mobile App Button */}
+            <button
+              onClick={handleInstallApp}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 font-semibold border border-emerald-600/70 shadow active:scale-95 transition-all text-xs sm:text-sm"
+              title="ফোনে মোবাইল অ্যাপ হিসেবে ইনস্টল করুন"
+            >
+              <Smartphone className="w-4 h-4 text-emerald-300" />
+              <span className="hidden sm:inline">অ্যাপ ইনস্টল</span>
+              <span className="sm:hidden">অ্যাপ</span>
             </button>
 
             {/* Admin Toggle / Logout */}
