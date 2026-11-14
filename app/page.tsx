@@ -9,6 +9,13 @@ import {
   saveStoredSettings,
   resetToDefaults,
 } from '../lib/storage';
+import {
+  subscribeToTransactions,
+  subscribeToSettings,
+  syncTransactionToCloud,
+  deleteTransactionFromCloud,
+  syncSettingsToCloud,
+} from '../lib/firebase';
 import { calculateTotals } from '../lib/utils';
 import { Header } from '../components/Header';
 import { OverviewStats } from '../components/OverviewStats';
@@ -18,26 +25,26 @@ import { CategoryBreakdown } from '../components/CategoryBreakdown';
 import { DonationModal } from '../components/DonationModal';
 import { QRCodePoster } from '../components/QRCodePoster';
 import { AdminModal } from '../components/AdminModal';
-import { AddTransactionModal } from '../components/AddTransactionModal';
+import { AddTransactionModal, PresetPayload } from '../components/AddTransactionModal';
 import { QuickJummahModal } from '../components/QuickJummahModal';
 import { SettingsModal } from '../components/SettingsModal';
 import { ReceiptModal } from '../components/ReceiptModal';
 import { AdminQuickActions } from '../components/AdminQuickActions';
-import { AdminBottomDock } from '../components/AdminBottomDock';
-import { PresetPayload } from '../components/AddTransactionModal';
+import { MobileNavigation, AppPage } from '../components/MobileNavigation';
+import { MenuView } from '../components/MenuView';
 import {
-  Heart,
-  QrCode,
-  Shield,
   HeartHandshake,
-  CheckCircle2,
-  PhoneCall,
-  MapPin,
-  ExternalLink,
+  QrCode,
+  CalendarCheck,
+  FileText,
+  PlusCircle,
+  Landmark,
 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
+  const [currentPage, setCurrentPage] = useState<AppPage>('home');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [settings, setSettings] = useState<MosqueSettings>(getStoredSettings());
   const [isAdmin, setIsAdmin] = useState(false);
@@ -55,59 +62,70 @@ export default function HomePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
 
-  // Load stored data on mount
+  // Load stored data and subscribe to Cloud Firebase on mount
   useEffect(() => {
     setMounted(true);
-    const storedTx = getStoredTransactions();
-    const storedSettings = getStoredSettings();
-    setTransactions(storedTx);
-    setSettings(storedSettings);
+    setTransactions(getStoredTransactions());
+    setSettings(getStoredSettings());
 
-    // Load admin state from session storage if any
     const savedAdmin = sessionStorage.getItem('mosque_admin_active');
     if (savedAdmin === 'true') {
       setIsAdmin(true);
     }
-  }, []);
 
-  // Sync to API in background (if server API is available)
-  const syncWithApi = async (updatedTx: Transaction[], updatedSettings: MosqueSettings) => {
-    try {
-      await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactions: updatedTx, settings: updatedSettings }),
-      });
-    } catch (e) {
-      // Ignore background sync errors
-    }
-  };
+    // Subscribe to Firebase real-time sync
+    const unsubTx = subscribeToTransactions((cloudTx) => {
+      if (cloudTx && cloudTx.length > 0) {
+        setTransactions(cloudTx);
+        saveStoredTransactions(cloudTx);
+      }
+    });
+
+    const unsubMeta = subscribeToSettings((cloudSettings) => {
+      if (cloudSettings) {
+        setSettings(cloudSettings);
+        saveStoredSettings(cloudSettings);
+      }
+    });
+
+    return () => {
+      unsubTx();
+      unsubMeta();
+    };
+  }, []);
 
   // Add or update transaction
   const handleSaveTransaction = (
     txData: Omit<Transaction, 'id' | 'createdAt'>,
     editId?: string
   ) => {
+    let updatedTx: Transaction;
     let updated: Transaction[];
+
     if (editId) {
-      updated = transactions.map((t) =>
-        t.id === editId
-          ? { ...t, ...txData }
-          : t
-      );
+      updated = transactions.map((t) => {
+        if (t.id === editId) {
+          updatedTx = { ...t, ...txData };
+          return updatedTx;
+        }
+        return t;
+      });
     } else {
-      const newTx: Transaction = {
+      updatedTx = {
         ...txData,
         id: `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         createdAt: new Date().toISOString(),
       };
-      updated = [newTx, ...transactions];
+      updated = [updatedTx, ...transactions];
     }
 
     setTransactions(updated);
     saveStoredTransactions(updated);
-    syncWithApi(updated, settings);
+    if (updatedTx!) {
+      syncTransactionToCloud(updatedTx);
+    }
     setEditingTransaction(null);
+    setPresetData(null);
   };
 
   // Delete transaction
@@ -115,14 +133,14 @@ export default function HomePage() {
     const updated = transactions.filter((t) => t.id !== id);
     setTransactions(updated);
     saveStoredTransactions(updated);
-    syncWithApi(updated, settings);
+    deleteTransactionFromCloud(id);
   };
 
   // Save settings
   const handleSaveSettings = (newSettings: MosqueSettings) => {
     setSettings(newSettings);
     saveStoredSettings(newSettings);
-    syncWithApi(transactions, newSettings);
+    syncSettingsToCloud(newSettings);
   };
 
   // 1-Click Quick Preset handler
@@ -141,15 +159,13 @@ export default function HomePage() {
     if (importedData.transactions) {
       setTransactions(importedData.transactions);
       saveStoredTransactions(importedData.transactions);
+      importedData.transactions.forEach((tx) => syncTransactionToCloud(tx));
     }
     if (importedData.settings) {
       setSettings(importedData.settings);
       saveStoredSettings(importedData.settings);
+      syncSettingsToCloud(importedData.settings);
     }
-    syncWithApi(
-      importedData.transactions || transactions,
-      importedData.settings || settings
-    );
   };
 
   // Reset data to defaults
@@ -157,7 +173,8 @@ export default function HomePage() {
     const { transactions: defaultTx, settings: defaultSettings } = resetToDefaults();
     setTransactions(defaultTx);
     setSettings(defaultSettings);
-    syncWithApi(defaultTx, defaultSettings);
+    defaultTx.forEach((tx) => syncTransactionToCloud(tx));
+    syncSettingsToCloud(defaultSettings);
   };
 
   // Admin login success
@@ -176,7 +193,7 @@ export default function HomePage() {
   const totals = calculateTotals(transactions);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 selection:bg-mosque-200 selection:text-mosque-900">
+    <div className="min-h-screen flex flex-col bg-slate-100 selection:bg-emerald-200 selection:text-emerald-900 pb-20 sm:pb-0">
       {/* Top Header & Navigation */}
       <Header
         settings={settings}
@@ -188,11 +205,13 @@ export default function HomePage() {
         onOpenAdminAuth={() => setIsAdminAuthOpen(true)}
         onOpenAddIncome={() => {
           setEditingTransaction(null);
+          setPresetData(null);
           setAddTxInitialType('income');
           setIsAddTxOpen(true);
         }}
         onOpenAddExpense={() => {
           setEditingTransaction(null);
+          setPresetData(null);
           setAddTxInitialType('expense');
           setIsAddTxOpen(true);
         }}
@@ -201,20 +220,19 @@ export default function HomePage() {
         onAdminLogout={handleAdminLogout}
       />
 
-      {/* Main Content Area */}
-      <main className="max-w-6xl mx-auto px-4 py-6 sm:py-8 space-y-6 sm:space-y-8 flex-1 w-full">
-        {/* 1. Primary Overview Stats (4 Cards) */}
-        <section aria-label="তহবিল সারাংশ">
-          <OverviewStats
-            totals={totals}
-            useBanglaDigits={useBanglaDigits}
-            currencySymbol={settings.currencySymbol}
-          />
-        </section>
+      {/* Main Container - Sized cleanly for Mobile App Experience */}
+      <main className="max-w-xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 flex-1 space-y-4">
+        {/* VIEW 1: HOME DASHBOARD */}
+        {currentPage === 'home' && (
+          <div className="space-y-4 animate-in fade-in">
+            {/* Overview Stats (4 Cards) */}
+            <OverviewStats
+              totals={totals}
+              useBanglaDigits={useBanglaDigits}
+              currencySymbol={settings.currencySymbol}
+            />
 
-        {/* 1.1 Admin Quick Actions Bar (Shown when Admin/Committee is active) */}
-        {isAdmin && (
-          <section aria-label="কমিটি কুইক অ্যাকশন">
+            {/* Quick Action Buttons for Easy Entry */}
             <AdminQuickActions
               onQuickPreset={handleQuickPreset}
               onOpenQuickJummah={() => setIsQuickJummahOpen(true)}
@@ -231,139 +249,131 @@ export default function HomePage() {
                 setIsAddTxOpen(true);
               }}
             />
-          </section>
+
+            {/* Visual Category Breakdown */}
+            <CategoryBreakdown
+              transactions={transactions}
+              useBanglaDigits={useBanglaDigits}
+              currencySymbol={settings.currencySymbol}
+            />
+
+            {/* Quick Banner: Scan View */}
+            <div className="bg-gradient-to-r from-emerald-900 to-mosque-950 text-white rounded-3xl p-5 shadow-md flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-extrabold text-sm sm:text-base">
+                  মুসল্লিদের জন্য উন্মুক্ত স্ক্যান পেজ
+                </h3>
+                <p className="text-xs text-emerald-200 mt-0.5">
+                  শুক্রবার জুমার টাকা ও বর্তমান ফান্ড লাইভ দেখুন
+                </p>
+              </div>
+              <Link
+                href="/scan"
+                className="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 text-mosque-950 font-bold text-xs shrink-0 shadow"
+              >
+                স্ক্যান পেজ
+              </Link>
+            </div>
+          </div>
         )}
 
-        {/* 2. Jummah Collection Tracker Section */}
-        <section aria-label="জুমার নামাজ কালেকশন">
-          <JummahTracker
-            jummahTransactions={totals.jummahTransactions}
-            averageJummah={totals.averageJummah}
-            totalJummahIncome={totals.totalJummahIncome}
-            useBanglaDigits={useBanglaDigits}
-            currencySymbol={settings.currencySymbol}
-            isAdmin={isAdmin}
-            onOpenQuickJummah={() => setIsQuickJummahOpen(true)}
-            onSelectTransaction={(tx) => setSelectedReceiptTx(tx)}
-          />
-        </section>
+        {/* VIEW 2: DEDICATED JUMMAH PAGE */}
+        {currentPage === 'jummah' && (
+          <div className="space-y-4 animate-in fade-in">
+            <JummahTracker
+              jummahTransactions={totals.jummahTransactions}
+              averageJummah={totals.averageJummah}
+              totalJummahIncome={totals.totalJummahIncome}
+              useBanglaDigits={useBanglaDigits}
+              currencySymbol={settings.currencySymbol}
+              isAdmin={isAdmin}
+              onOpenQuickJummah={() => setIsQuickJummahOpen(true)}
+              onSelectTransaction={(tx) => setSelectedReceiptTx(tx)}
+            />
+          </div>
+        )}
 
-        {/* 3. Detailed Transaction Ledger (Table & Filter Tabs) */}
-        <section aria-label="সকল হিসাব বিবরণী">
-          <TransactionList
-            transactions={transactions}
-            useBanglaDigits={useBanglaDigits}
-            currencySymbol={settings.currencySymbol}
-            mosqueName={settings.mosqueName}
-            isAdmin={isAdmin}
-            onSelectTransaction={(tx) => setSelectedReceiptTx(tx)}
-            onEditTransaction={(tx) => {
-              setEditingTransaction(tx);
-              setAddTxInitialType(tx.type);
-              setIsAddTxOpen(true);
-            }}
-            onDeleteTransaction={handleDeleteTransaction}
-          />
-        </section>
+        {/* VIEW 3: DEDICATED LEDGER / TRANSACTIONS PAGE */}
+        {currentPage === 'ledger' && (
+          <div className="space-y-4 animate-in fade-in">
+            <TransactionList
+              transactions={transactions}
+              useBanglaDigits={useBanglaDigits}
+              currencySymbol={settings.currencySymbol}
+              mosqueName={settings.mosqueName}
+              isAdmin={isAdmin}
+              onSelectTransaction={(tx) => setSelectedReceiptTx(tx)}
+              onEditTransaction={(tx) => {
+                setEditingTransaction(tx);
+                setAddTxInitialType(tx.type);
+                setIsAddTxOpen(true);
+              }}
+              onDeleteTransaction={handleDeleteTransaction}
+            />
+          </div>
+        )}
 
-        {/* 4. Category Visual Breakdown (Incomes & Expenses) */}
-        <section aria-label="খাতভিত্তিক বিশ্লেষণ">
-          <CategoryBreakdown
-            transactions={transactions}
-            useBanglaDigits={useBanglaDigits}
-            currencySymbol={settings.currencySymbol}
-          />
-        </section>
+        {/* VIEW 4: DEDICATED ADD ENTRY PAGE */}
+        {currentPage === 'add' && (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200">
+              <h2 className="text-base font-extrabold text-slate-800 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                <PlusCircle className="w-5 h-5 text-emerald-600" />
+                <span>নতুন হিসাব এন্ট্রি করুন</span>
+              </h2>
 
-        {/* 5. Online Donation Callout Banner for Musallis */}
-        <section className="bg-gradient-to-r from-mosque-900 via-mosque-800 to-emerald-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-mosque-700/60 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-2 text-center md:text-left z-10">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gold-500/20 text-gold-300 text-xs font-semibold border border-gold-400/30">
-              <HeartHandshake className="w-3.5 h-3.5 text-gold-400" />
-              <span>আল্লাহর সন্তুষ্টির জন্য সদকা করুন</span>
+              <AdminQuickActions
+                onQuickPreset={handleQuickPreset}
+                onOpenQuickJummah={() => setIsQuickJummahOpen(true)}
+                onOpenAddIncome={() => {
+                  setEditingTransaction(null);
+                  setPresetData(null);
+                  setAddTxInitialType('income');
+                  setIsAddTxOpen(true);
+                }}
+                onOpenAddExpense={() => {
+                  setEditingTransaction(null);
+                  setPresetData(null);
+                  setAddTxInitialType('expense');
+                  setIsAddTxOpen(true);
+                }}
+              />
             </div>
-            <h3 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-              মসজিদের উন্নয়ন তহবিলে অংশ নিন
-            </h3>
-            <p className="text-xs sm:text-sm text-mosque-200 max-w-xl">
-              বিকাশ, নগদ, রকেট অথবা সরাসরি ব্যাংকে অনুদান পাঠাতে পারবেন। প্রতিটি টাকার হিসাব এখানে উন্মুক্তভাবে সংরক্ষিত থাকে।
-            </p>
           </div>
+        )}
 
-          <div className="flex flex-wrap items-center gap-3 z-10">
-            <button
-              onClick={() => setIsDonationOpen(true)}
-              className="px-6 py-3 rounded-2xl bg-gold-500 hover:bg-gold-400 text-mosque-950 font-extrabold text-sm sm:text-base shadow-lg transition-transform active:scale-95 flex items-center gap-2"
-            >
-              <HeartHandshake className="w-5 h-5 text-mosque-950" />
-              <span>অনলাইন অনুদান নম্বরসমূহ</span>
-            </button>
-
-            <button
-              onClick={() => setIsQROpen(true)}
-              className="px-4 py-3 rounded-2xl bg-mosque-800/80 hover:bg-mosque-700 text-white font-semibold text-sm border border-mosque-600 transition-colors flex items-center gap-2"
-            >
-              <QrCode className="w-4 h-4 text-gold-300" />
-              <span>কিউআর পোস্টার</span>
-            </button>
+        {/* VIEW 5: DEDICATED MENU / SETTINGS PAGE */}
+        {currentPage === 'menu' && (
+          <div className="space-y-4 animate-in fade-in">
+            <MenuView
+              settings={settings}
+              isAdmin={isAdmin}
+              onOpenQR={() => setIsQROpen(true)}
+              onOpenDonation={() => setIsDonationOpen(true)}
+              onOpenAdminAuth={() => setIsAdminAuthOpen(true)}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onAdminLogout={handleAdminLogout}
+              useBanglaDigits={useBanglaDigits}
+              onToggleDigits={() => setUseBanglaDigits(!useBanglaDigits)}
+            />
           </div>
-        </section>
+        )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 text-xs py-8 border-t border-slate-800 mt-12">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="text-center md:text-left">
-            <div className="text-white font-bold text-sm flex items-center justify-center md:justify-start gap-1.5">
-              <span>🕌</span>
-              <span>{settings.mosqueName}</span>
-            </div>
-            <p className="text-slate-400 text-[11px] mt-1">
-              স্বচ্ছ ও আধুনিক ডিজিটাল হিসাব পোর্টাল • সর্বস্বত্ব সংরক্ষিত © {new Date().getFullYear()}
-            </p>
-          </div>
+      {/* Mobile Bottom Navigation Bar - Android App Feel */}
+      <MobileNavigation
+        currentPage={currentPage}
+        onSelectPage={setCurrentPage}
+        isAdmin={isAdmin}
+        onOpenAddIncome={() => {
+          setEditingTransaction(null);
+          setPresetData(null);
+          setAddTxInitialType('income');
+          setIsAddTxOpen(true);
+        }}
+      />
 
-          <div className="flex flex-wrap items-center justify-center gap-4 text-[11px]">
-            <button
-              onClick={() => setIsQROpen(true)}
-              className="hover:text-white transition-colors flex items-center gap-1"
-            >
-              <QrCode className="w-3.5 h-3.5 text-gold-400" />
-              <span>কিউআর কোড পোস্টার</span>
-            </button>
-
-            <span className="text-slate-700">•</span>
-
-            <button
-              onClick={() => setIsDonationOpen(true)}
-              className="hover:text-white transition-colors flex items-center gap-1"
-            >
-              <HeartHandshake className="w-3.5 h-3.5 text-emerald-400" />
-              <span>অনলাইন অনুদান</span>
-            </button>
-
-            <span className="text-slate-700">•</span>
-
-            {isAdmin ? (
-              <button
-                onClick={handleAdminLogout}
-                className="text-rose-400 hover:text-rose-300 transition-colors"
-              >
-                লগআউট
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsAdminAuthOpen(true)}
-                className="hover:text-white transition-colors"
-              >
-                কমিটি লগইন
-              </button>
-            )}
-          </div>
-        </div>
-      </footer>
-
-      {/* All Application Modals */}
+      {/* Application Modals */}
       <DonationModal
         isOpen={isDonationOpen}
         onClose={() => setIsDonationOpen(false)}
@@ -397,26 +407,6 @@ export default function HomePage() {
         editingTransaction={editingTransaction}
         presetData={presetData}
       />
-
-      {/* Mobile Sticky Floating Dock when Admin is active */}
-      {isAdmin && (
-        <AdminBottomDock
-          onOpenAddIncome={() => {
-            setEditingTransaction(null);
-            setPresetData(null);
-            setAddTxInitialType('income');
-            setIsAddTxOpen(true);
-          }}
-          onOpenAddExpense={() => {
-            setEditingTransaction(null);
-            setPresetData(null);
-            setAddTxInitialType('expense');
-            setIsAddTxOpen(true);
-          }}
-          onOpenQuickJummah={() => setIsQuickJummahOpen(true)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-        />
-      )}
 
       <QuickJummahModal
         isOpen={isQuickJummahOpen}

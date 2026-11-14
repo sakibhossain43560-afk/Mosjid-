@@ -19,6 +19,7 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Calendar,
+  CalendarCheck,
   Layers,
 } from 'lucide-react';
 
@@ -191,13 +192,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
           <button
             onClick={() => setActiveTab('jummah')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+            className={`flex items-center gap-1 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all ${
               activeTab === 'jummah'
                 ? 'bg-gold-600 text-white shadow-sm'
                 : 'bg-gold-50 text-gold-800 hover:bg-gold-100'
             }`}
           >
-            🕌 জুমার কালেকশন
+            <CalendarCheck className="w-3.5 h-3.5" />
+            <span>জুমার কালেকশন</span>
           </button>
         </div>
 
@@ -314,7 +316,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                         {formatBengaliDate(tx.date)}
                       </div>
                       <div className="text-[11px] text-slate-400">
-                        {tx.isJummah ? '🕌 শুক্রবার' : ''}
+                        {tx.isJummah ? 'শুক্রবার' : ''}
                       </div>
                     </td>
 

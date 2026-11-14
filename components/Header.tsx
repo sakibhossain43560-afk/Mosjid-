@@ -14,6 +14,8 @@ import {
   LogOut,
   Bell,
   Sparkles,
+  Landmark,
+  MapPin,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -98,8 +100,8 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="space-y-1.5">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-gold-500 to-gold-400 p-0.5 shadow-lg flex items-center justify-center shrink-0">
-                <div className="w-full h-full bg-mosque-900 rounded-[14px] flex items-center justify-center text-2xl sm:text-3xl">
-                  🕌
+                <div className="w-full h-full bg-mosque-900 rounded-[14px] flex items-center justify-center text-gold-400">
+                  <Landmark className="w-7 h-7 sm:w-8 sm:h-8" />
                 </div>
               </div>
               <div>
@@ -115,7 +117,10 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-mosque-200 pt-1">
-              <span>📍 {settings.mosqueAddress}</span>
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-gold-400" />
+                {settings.mosqueAddress}
+              </span>
               {settings.establishedYear && (
                 <>
                   <span className="text-mosque-500">•</span>

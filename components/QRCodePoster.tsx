@@ -14,6 +14,7 @@ import {
   Sparkles,
   Smartphone,
   ShieldCheck,
+  Landmark,
 } from 'lucide-react';
 
 interface QRCodePosterProps {
@@ -167,7 +168,9 @@ export const QRCodePoster: React.FC<QRCodePosterProps> = ({
             </div>
 
             {/* Mosque Icon & Name */}
-            <div className="text-3xl mb-1">🕌</div>
+            <div className="w-12 h-12 rounded-2xl bg-mosque-100 border border-mosque-300 text-mosque-800 flex items-center justify-center mx-auto mb-2 shadow-sm">
+              <Landmark className="w-6 h-6" />
+            </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-mosque-950 tracking-tight">
               {settings.mosqueName}
             </h1>
@@ -201,18 +204,14 @@ export const QRCodePoster: React.FC<QRCodePosterProps> = ({
             <div className="inline-block p-4 rounded-2xl bg-white shadow-md border-2 border-dashed border-mosque-600 mb-4">
               <QRCodeSVG
                 ref={qrRef}
-                value={siteUrl || 'https://mosjid-ledger.vercel.app'}
+                value={
+                  (siteUrl || 'https://mosjid-ledger.vercel.app').endsWith('/scan')
+                    ? siteUrl || 'https://mosjid-ledger.vercel.app'
+                    : `${(siteUrl || 'https://mosjid-ledger.vercel.app').replace(/\/$/, '')}/scan`
+                }
                 size={220}
                 level="H"
                 includeMargin={false}
-                imageSettings={{
-                  src: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕌</text></svg>',
-                  x: undefined,
-                  y: undefined,
-                  height: 38,
-                  width: 38,
-                  excavate: true,
-                }}
               />
             </div>
 
