@@ -5,17 +5,13 @@ import { formatCurrency, formatBengaliDate, toBengaliNumber } from '../lib/utils
 import { Transaction } from '../lib/types';
 import {
   Wallet,
-  TrendingUp,
+  CalendarCheck,
   TrendingDown,
-  Calendar,
-  CheckCircle2,
+  TrendingUp,
   Users,
-  Award,
   Sparkles,
-  ArrowUpRight,
   ArrowDownLeft,
-  Building2,
-  Coins,
+  ArrowUpRight,
 } from 'lucide-react';
 
 interface OverviewStatsProps {
@@ -40,125 +36,99 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
   currencySymbol,
 }) => {
   return (
-    <div className="space-y-4">
-      {/* 4 Primary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {/* 1. Total Net Balance (বর্তমান মোট তহবিল) */}
-        <div className="bg-gradient-to-br from-emerald-950 via-mosque-900 to-mosque-950 text-white rounded-3xl p-6 shadow-xl border border-emerald-500/30 relative overflow-hidden flex flex-col justify-between group hover:border-emerald-400/50 transition-all">
-          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform"></div>
+    <div className="space-y-3">
+      {/* 1. Main Wallet Account Card */}
+      <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 text-white rounded-3xl p-5 shadow-lg border border-emerald-700/50 relative overflow-hidden">
+        {/* Subtle decorative glow */}
+        <div className="absolute -right-10 -bottom-10 w-36 h-36 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none"></div>
 
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-300 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-                বর্তমান তহবিল স্থিতি
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/30 shadow-inner">
-                <Wallet className="w-5 h-5" />
-              </div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+            <Wallet className="w-3.5 h-3.5 text-gold-400" />
+            <span>বর্তমান মোট তহবিল</span>
+          </span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-800/80 text-emerald-200 border border-emerald-600/50">
+            ক্যাশ ও ব্যাংক
+          </span>
+        </div>
+
+        {/* Large Net Balance */}
+        <div className="text-3xl sm:text-4xl font-black text-white tracking-tight my-2">
+          {formatCurrency(totals.netBalance, useBanglaDigits, currencySymbol)}
+        </div>
+
+        {/* Sub-stat Pills inside card */}
+        <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-emerald-800/80">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-800/90 text-emerald-300 flex items-center justify-center shrink-0">
+              <ArrowDownLeft className="w-4 h-4" />
             </div>
-
-            <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-              {formatCurrency(totals.netBalance, useBanglaDigits, currencySymbol)}
+            <div>
+              <div className="text-[10px] text-emerald-300">মোট জমা</div>
+              <div className="text-xs font-bold text-white">
+                {formatCurrency(totals.totalIncome, useBanglaDigits, currencySymbol)}
+              </div>
             </div>
           </div>
 
-          <div className="mt-5 pt-3.5 border-t border-emerald-800/60 flex items-center justify-between text-xs text-mosque-200">
-            <span className="flex items-center gap-1.5 text-emerald-300 font-semibold">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              হাতে ও ব্যাংকে জমা
-            </span>
-            <span className="text-mosque-300 font-medium">
-              মোট জমা: {formatCurrency(totals.totalIncome, useBanglaDigits, currencySymbol)}
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-rose-900/60 text-rose-300 flex items-center justify-center shrink-0">
+              <ArrowUpRight className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[10px] text-rose-300">মোট খরচ</div>
+              <div className="text-xs font-bold text-white">
+                {formatCurrency(totals.totalExpense, useBanglaDigits, currencySymbol)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Two Mini Highlight Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Latest Jummah Card */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                <CalendarCheck className="w-3.5 h-3.5 text-amber-600" />
+                <span>সর্বশেষ জুমা</span>
+              </span>
+            </div>
+            <div className="text-lg sm:text-xl font-black text-slate-900 mt-1">
+              {totals.latestJummah
+                ? formatCurrency(totals.latestJummah.amount, useBanglaDigits, currencySymbol)
+                : `${currencySymbol} ০`}
+            </div>
+          </div>
+
+          <div className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-100 flex items-center gap-1">
+            <Users className="w-3 h-3 text-slate-400" />
+            <span>
+              {totals.latestJummah?.jummahDetails?.estimatedAttendees
+                ? `${toBengaliNumber(totals.latestJummah.jummahDetails.estimatedAttendees)} জন`
+                : 'গত শুক্রবার'}
             </span>
           </div>
         </div>
 
-        {/* 2. This Month Income (চলতি মাসের মোট জমা) */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/90 flex flex-col justify-between hover:shadow-lg hover:border-emerald-300 transition-all group">
+        {/* This Month Expense Card */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                চলতি মাসের মোট জমা
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-bold text-rose-900 flex items-center gap-1">
+                <TrendingDown className="w-3.5 h-3.5 text-rose-600" />
+                <span>চলতি মাসের ব্যয়</span>
               </span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <TrendingUp className="w-5 h-5" />
-              </div>
             </div>
-
-            <div className="text-3xl sm:text-4xl font-extrabold text-emerald-600 tracking-tight">
-              {formatCurrency(totals.thisMonthIncome, useBanglaDigits, currencySymbol)}
-            </div>
-          </div>
-
-          <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>দান ও মাসিক চাঁদা বাবদ</span>
-            <span className="font-extrabold text-emerald-600 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200">
-              +জমা
-            </span>
-          </div>
-        </div>
-
-        {/* 3. This Month Expense (চলতি মাসের মোট খরচ) */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/90 flex flex-col justify-between hover:shadow-lg hover:border-rose-300 transition-all group">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                চলতি মাসের মোট ব্যয়
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <TrendingDown className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="text-3xl sm:text-4xl font-extrabold text-rose-600 tracking-tight">
+            <div className="text-lg sm:text-xl font-black text-rose-600 mt-1">
               {formatCurrency(totals.thisMonthExpense, useBanglaDigits, currencySymbol)}
             </div>
           </div>
 
-          <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>বেতন, বিল ও মেরামত</span>
-            <span className="font-extrabold text-rose-600 px-2 py-0.5 rounded-md bg-rose-50 border border-rose-200">
-              -খরচ
-            </span>
-          </div>
-        </div>
-
-        {/* 4. Latest Jummah Collection (সর্বশেষ জুমার কালেকশন) */}
-        <div className="bg-gradient-to-br from-amber-50 via-amber-100/60 to-gold-50 rounded-3xl p-6 shadow-sm border border-amber-200/90 flex flex-col justify-between hover:shadow-lg hover:border-amber-400 transition-all group">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-amber-600" />
-                সর্বশেষ জুমার কালেকশন
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-amber-200 text-amber-900 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Calendar className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="text-3xl sm:text-4xl font-extrabold text-amber-950 tracking-tight">
-              {totals.latestJummah
-                ? formatCurrency(totals.latestJummah.amount, useBanglaDigits, currencySymbol)
-                : `${currencySymbol} 0`}
-            </div>
-          </div>
-
-          <div className="mt-5 pt-3.5 border-t border-amber-200/70 flex items-center justify-between text-xs text-amber-900">
-            <span className="font-semibold">
-              {totals.latestJummah
-                ? formatBengaliDate(totals.latestJummah.date)
-                : 'কোনো এন্ট্রি নেই'}
-            </span>
-            {totals.latestJummah?.jummahDetails?.estimatedAttendees && (
-              <span className="flex items-center gap-1 font-bold bg-amber-200/80 px-2 py-0.5 rounded-full text-[11px]">
-                <Users className="w-3 h-3" />
-                {useBanglaDigits
-                  ? toBengaliNumber(totals.latestJummah.jummahDetails.estimatedAttendees)
-                  : totals.latestJummah.jummahDetails.estimatedAttendees}{' '}
-                জন
-              </span>
-            )}
+          <div className="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-100 truncate">
+            বেতন ও ইউটিলিটি বিল
           </div>
         </div>
       </div>

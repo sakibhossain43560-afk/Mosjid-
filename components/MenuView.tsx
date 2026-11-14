@@ -168,3 +168,4 @@ export const MenuView: React.FC<MenuViewProps> = ({
     </div>
   );
 };
+
